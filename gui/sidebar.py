@@ -1,74 +1,104 @@
 import customtkinter as ctk
-import os
 
-# Only import Pillow if we actually use a logo
-try:
-    from PIL import Image
-except ImportError:
-    Image = None
+from history.chat_history import load_chats
 
 
-def create_sidebar(parent):
-    sidebar = ctk.CTkFrame(
-        parent,
-        width=190,
-        corner_radius=0
-    )
-    sidebar.pack(side="left", fill="y")
-    sidebar.pack_propagate(False)
+def create_sidebar(parent, open_chat, new_chat):
 
-    # ===== Logo (Optional) =====
+	sidebar = ctk.CTkFrame(
+		parent,
+		width=220,
+		corner_radius=0
+	)
 
-    logo_path = os.path.join("assets", "logo.png")
+	sidebar.pack(side="left", fill="y")
+	sidebar.pack_propagate(False)
 
-    if Image is not None and os.path.exists(logo_path):
-        try:
-            logo = ctk.CTkImage(
-                light_image=Image.open(logo_path),
-                dark_image=Image.open(logo_path),
-                size=(70, 70)
-            )
+	# ===== Title =====
 
-            logo_label = ctk.CTkLabel(
-                sidebar,
-                image=logo,
-                text=""
-            )
-            logo_label.pack(pady=(25, 10))
+	title = ctk.CTkLabel(
+		sidebar,
+		text="🤖 Future AI",
+		font=("Segoe UI", 24, "bold")
+	)
+	title.pack(pady=(20, 15))
 
-        except Exception:
-            # Ignore bad or corrupted logo files
-            pass
+	# ===== New Chat =====
 
-    # ===== Title =====
+	ctk.CTkButton(
+		sidebar,
+		text="+ New Chat",
+		command=new_chat
+	).pack(fill="x", padx=15, pady=(0, 15))
 
-    title = ctk.CTkLabel(
-        sidebar,
-        text="🤖 Future AI",
-        font=("Segoe UI", 24, "bold")
-    )
-    title.pack(pady=(20, 25))
+	# ===== Recent Chats =====
 
-    # ===== Navigation =====
+	ctk.CTkLabel(
+		sidebar,
+		text="Recent Chats",
+		font=("Segoe UI", 16, "bold")
+	).pack(anchor="w", padx=15)
 
-    buttons = [
-        "+ New Chat",
-        "💬 Chat",
-        "🔍 Research",
-        "📚 Learn",
-        "🎨 Images",
-        "💡 Brainstorm",
-        "🌐 Website Builder",
-        "⚙️ Settings"
-    ]
+	chats = load_chats()
 
-    for text in buttons:
-        button = ctk.CTkButton(
-            sidebar,
-            text=text,
-            height=42,
-            corner_radius=10
-        )
-        button.pack(fill="x", padx=15, pady=6)
+	if not chats:
 
-    return sidebar
+		ctk.CTkLabel(
+			sidebar,
+			text="No chats yet",
+			text_color="gray"
+		).pack(anchor="w", padx=20, pady=10)
+
+	else:
+
+		for i, chat in enumerate(chats):
+
+			title = chat["title"]
+
+			if len(title) > 28:
+				title = title[:28] + "..."
+
+			ctk.CTkButton(
+				sidebar,
+				text="💬 " + title,
+				anchor="w",
+				height=34,
+				command=lambda i=i: open_chat(i)
+			).pack(
+				fill="x",
+				padx=15,
+				pady=3
+			)
+
+	# ===== Divider =====
+
+	ctk.CTkLabel(
+		sidebar,
+		text="────────────────"
+	).pack(pady=10)
+
+	# ===== Tools =====
+
+	tools = [
+		"🔍 Research",
+		"📚 Learn",
+		"🎨 Images",
+		"💡 Brainstorm",
+		"🌐 Website Builder",
+		"⚙️ Settings"
+	]
+
+	for tool in tools:
+
+		ctk.CTkButton(
+			sidebar,
+			text=tool,
+			height=38
+		).pack(
+			fill="x",
+			padx=15,
+			pady=4
+		)
+
+	return sidebar
+
