@@ -1,26 +1,24 @@
 import customtkinter as ctk
 
+from gui.sidebar import create_sidebar
+from gui.chat_view import create_chat_view
+from gui.input_bar import create_input_bar
+
 
 def start_gui():
+
     ctk.set_appearance_mode("dark")
     ctk.set_default_color_theme("blue")
 
     app = ctk.CTk()
+
     app.title("🤖 Future AI")
-    app.geometry("1100x700")
+    app.geometry("1200x720")
 
-    title = ctk.CTkLabel(
-        app,
-        text="🤖 Future AI v0.3",
-        font=("Segoe UI", 28, "bold")
-    )
-    title.pack(pady=30)
+    create_sidebar(app)
 
-    subtitle = ctk.CTkLabel(
-        app,
-        text="Welcome to the new modular version of Future AI!",
-        font=("Segoe UI", 16)
-    )
-    subtitle.pack()
+    chat_frame, chat = create_chat_view(app)
+
+    message, send_button = create_input_bar(chat_frame)
 
     app.mainloop()
