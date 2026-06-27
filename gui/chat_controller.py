@@ -1,4 +1,4 @@
-from tkinter import simpledialog
+from tkinter import simpledialog, messagebox
 
 from brain import get_response, teach
 
@@ -15,7 +15,8 @@ from history.chat_history import (
     add_message,
     rename_chat,
     load_chats,
-    get_chat
+    get_chat,
+    delete_chat
 )
 
 
@@ -26,7 +27,6 @@ class ChatController:
         self.app = app
         self.chat = chat
 
-        # No chat exists until the first message is sent
         self.current_chat = None
 
         self.welcome_cleared = False
@@ -65,7 +65,6 @@ class ChatController:
 
     def new_chat(self):
 
-        # Don't save anything yet
         self.current_chat = None
 
         self.welcome_cleared = False
@@ -73,6 +72,37 @@ class ChatController:
         self.clear_chat()
 
         create_welcome_card(self.chat)
+
+    def delete_chat(self, chat_id):
+
+        answer = messagebox.askyesno(
+            "Delete Chat",
+            "Delete this conversation?"
+        )
+
+        if not answer:
+            return
+
+        delete_chat(chat_id)
+
+        # If the deleted chat was open, reset the screen
+        if self.current_chat == chat_id:
+
+            self.current_chat = None
+
+            self.clear_chat()
+
+            create_welcome_card(self.chat)
+
+            self.welcome_cleared = False
+
+        # If a chat before the current one was deleted,
+        # shift the current index down by one.
+        elif self.current_chat is not None and chat_id < self.current_chat:
+            self.current_chat -= 1
+
+        if self.sidebar:
+            self.sidebar.refresh()
 
     def send(self, message_box):
 
@@ -87,7 +117,6 @@ class ChatController:
 
         add_user_bubble(self.chat, user)
 
-        # Create the conversation only when the first message is sent
         if self.current_chat is None:
 
             self.current_chat = create_chat("New Chat")

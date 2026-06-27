@@ -25,7 +25,8 @@ def start_gui():
     sidebar = SidebarManager(
         app,
         controller.open_chat,
-        controller.new_chat
+        controller.new_chat,
+        controller.delete_chat
     )
 
     # Give the controller access to the sidebar
