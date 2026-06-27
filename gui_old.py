@@ -22,6 +22,26 @@ def start_gui():
 
     chat = ctk.CTkTextbox(main, font=("Arial", 15))
     chat.pack(fill="both", expand=True, padx=15, pady=15)
+    chat.insert(
+    "end",
+    """🤖 Future AI
+
+Welcome back!
+
+What would you like to do today?
+
+• 💬 Chat
+• 🔍 Research
+• 🌐 Build a Website
+• 📚 Learn Something
+• 🎨 Create Images
+
+────────────────────────────
+
+Type a message below to get started.
+
+"""
+)
 
     def new_chat():
         chat.delete("1.0", "end")
@@ -103,38 +123,42 @@ def start_gui():
 
     def send():
 
-        user = message.get().strip()
+    user = message.get().strip()
 
-        if not user:
-            return
+    if not user:
+        return
 
-        chat.insert("end", f"👤 You:\n{user}\n\n")
+    # Remove welcome screen on first message
+    if "Welcome back!" in chat.get("1.0", "end"):
+        chat.delete("1.0", "end")
 
-        reply = get_response(user)
+    chat.insert("end", f"👤 You:\n{user}\n\n")
 
-        if reply is None:
-            answer = simpledialog.askstring(
-                "Teach Future AI",
-                f"What should I answer?\n\n{user}"
-            )
+    reply = get_response(user)
 
-            if answer:
-                teach(user, answer)
-                reply = "Thanks! I learned something new."
-            else:
-                reply = "Okay."
+    if reply is None:
+        answer = simpledialog.askstring(
+            "Teach Future AI",
+            f"What should I answer?\n\n{user}"
+        )
 
-        chat.insert("end", f"🤖 Future AI:\n{reply}\n\n")
-        chat.see("end")
+        if answer:
+            teach(user, answer)
+            reply = "Thanks! I learned something new."
+        else:
+            reply = "Okay."
 
-        message.delete(0, "end")
+    chat.insert("end", f"🤖 Future AI:\n{reply}\n\n")
+    chat.see("end")
 
-    ctk.CTkButton(
-        bottom,
-        text="Send",
-        command=send
-    ).pack(side="right")
+    message.delete(0, "end")
 
-    message.bind("<Return>", lambda event: send())
+ctk.CTkButton(
+    bottom,
+    text="Send",
+    command=send
+).pack(side="right")
 
-    app.mainloop()
+message.bind("<Return>", lambda event: send())
+
+app.mainloop()  
