@@ -26,8 +26,12 @@ class ChatController:
         self.app = app
         self.chat = chat
 
-        self.current_chat = create_chat("New Chat")
+        # No chat exists until the first message is sent
+        self.current_chat = None
+
         self.welcome_cleared = False
+
+        self.sidebar = None
 
     def clear_chat(self):
 
@@ -47,7 +51,7 @@ class ChatController:
             create_welcome_card(self.chat)
             return
 
-        if not conversation["messages"]:
+        if len(conversation["messages"]) == 0:
             create_welcome_card(self.chat)
             return
 
@@ -61,7 +65,8 @@ class ChatController:
 
     def new_chat(self):
 
-        self.current_chat = create_chat("New Chat")
+        # Don't save anything yet
+        self.current_chat = None
 
         self.welcome_cleared = False
 
@@ -82,12 +87,31 @@ class ChatController:
 
         add_user_bubble(self.chat, user)
 
-        add_message(self.current_chat, "user", user)
+        # Create the conversation only when the first message is sent
+        if self.current_chat is None:
+
+            self.current_chat = create_chat("New Chat")
+
+            if self.sidebar:
+                self.sidebar.refresh()
+
+        add_message(
+            self.current_chat,
+            "user",
+            user
+        )
 
         chats = load_chats()
 
         if len(chats[self.current_chat]["messages"]) == 1:
-            rename_chat(self.current_chat, user)
+
+            rename_chat(
+                self.current_chat,
+                user
+            )
+
+            if self.sidebar:
+                self.sidebar.refresh()
 
         thinking = add_system_bubble(
             self.chat,
@@ -113,7 +137,10 @@ class ChatController:
 
         thinking.destroy()
 
-        add_ai_bubble(self.chat, reply)
+        add_ai_bubble(
+            self.chat,
+            reply
+        )
 
         add_message(
             self.current_chat,

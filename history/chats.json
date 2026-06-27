@@ -1,6 +1,6 @@
 [
     {
-        "title": "New Chat",
+        "title": "hello",
         "messages": [
             {
                 "role": "user",
@@ -9,52 +9,7 @@
             {
                 "role": "assistant",
                 "text": "Hello! \ud83d\udc4b"
-            },
-            {
-                "role": "user",
-                "text": "who are you"
-            },
-            {
-                "role": "assistant",
-                "text": "I'm Future AI."
             }
         ]
-    },
-    {
-        "title": "New Chat",
-        "messages": []
-    },
-    {
-        "title": "Build me a gaming website",
-        "messages": [
-            {
-                "role": "user",
-                "text": "Build me a gaming website"
-            },
-            {
-                "role": "assistant",
-                "text": "Okay."
-            }
-        ]
-    },
-    {
-        "title": "New Chat",
-        "messages": []
-    },
-    {
-        "title": "New Chat",
-        "messages": []
-    },
-    {
-        "title": "New Chat",
-        "messages": []
-    },
-    {
-        "title": "New Chat",
-        "messages": []
-    },
-    {
-        "title": "New Chat",
-        "messages": []
     }
 ]
