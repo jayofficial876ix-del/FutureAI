@@ -1,5 +1,8 @@
 {
     "what is chatgpt?": "ChatGPT is an AI assistant that can help people learn and create.",
     "2+2=": "4",
-    "what 10+10=": "20"
+    "what 10+10=": "20",
+    "10+10=": "20",
+    "2+2": "=4",
+    "what is 100+100=": "200"
 }

@@ -1,7 +1,7 @@
 import customtkinter as ctk
 
 
-def create_input_bar(parent, send_callback):
+def create_input_bar(parent, send_callback, attach_callback):
 
     bottom = ctk.CTkFrame(parent)
     bottom.pack(fill="x", padx=20, pady=(0, 20))
@@ -10,7 +10,8 @@ def create_input_bar(parent, send_callback):
     attach_button = ctk.CTkButton(
         bottom,
         text="📎",
-        width=40
+        width=40,
+        command=attach_callback
     )
     attach_button.pack(side="left", padx=(0, 8))
 

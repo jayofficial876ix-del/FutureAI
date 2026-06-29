@@ -1,41 +1,81 @@
 import customtkinter as ctk
 
-from gui.chat_view import create_chat_view
-from gui.input_bar import create_input_bar
+from gui.app_layout import AppLayout
 from gui.chat_controller import ChatController
-from gui.sidebar_manager import SidebarManager
+from gui.symbol_search import SymbolSearch
+from gui.quick_open import QuickOpen
+
+from projects.project_manager import current_project_path
 
 
 def start_gui():
 
-    ctk.set_appearance_mode("dark")
-    ctk.set_default_color_theme("blue")
+	ctk.set_appearance_mode("dark")
+	ctk.set_default_color_theme("blue")
 
-    app = ctk.CTk()
-    app.title("🤖 Future AI")
-    app.geometry("1200x720")
+	app = ctk.CTk()
 
-    # Chat Area
-    chat_frame, chat = create_chat_view(app)
+	app.title("🤖 Future AI")
+	app.geometry("1800x1000")
 
-    # Controller
-    controller = ChatController(app, chat)
+	# --------------------------------
+	# Controller
+	# --------------------------------
 
-    # Sidebar
-    sidebar = SidebarManager(
-        app,
-        controller.open_chat,
-        controller.new_chat,
-        controller.delete_chat
-    )
+	controller = ChatController(
+		app,
+		None
+	)
 
-    # Give the controller access to the sidebar
-    controller.sidebar = sidebar
+	# --------------------------------
+	# Main Layout
+	# --------------------------------
 
-    # Input Bar
-    message, send_button = create_input_bar(
-        chat_frame,
-        lambda: controller.send(message)
-    )
+	layout = AppLayout(
+		app,
+		controller
+	)
 
-    app.mainloop()
+	controller.layout = layout
+
+	# --------------------------------
+	# Ctrl + T
+	# Go To Symbol
+	# --------------------------------
+
+	def open_symbol_search(event=None):
+
+		SymbolSearch(
+			app,
+			controller.open_symbol
+		)
+
+	app.bind_all(
+		"<Control-t>",
+		open_symbol_search
+	)
+
+	# --------------------------------
+	# Ctrl + P
+	# Quick Open
+	# --------------------------------
+
+	def quick_open(event=None):
+
+		project = current_project_path()
+
+		if not project:
+			return
+
+		QuickOpen(
+			app,
+			project,
+			layout.editor.open_file
+		)
+
+	app.bind_all(
+		"<Control-p>",
+		quick_open
+	)
+
+	app.mainloop()

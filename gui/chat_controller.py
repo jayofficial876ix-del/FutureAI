@@ -1,14 +1,29 @@
+from projects.project_manager import load_projects
+from services.context_retriever import ContextRetriever
 from tkinter import simpledialog, messagebox
+import os
 
-from brain import get_response, teach
+from services.file_manager import choose_file
+from services.file_reader import read_file
+
+from ai.ai_engine import AIEngine
+from services.ai_actions import AIActions
+from services.agent import AIAgent
 
 from gui.message_bubble import (
     add_user_bubble,
     add_ai_bubble,
+    add_streaming_bubble,
     add_system_bubble
 )
 
+from gui.attachment_card import create_attachment_card
 from gui.chat_view import create_welcome_card
+from gui.diff_viewer import DiffViewer
+from gui.agent_review import AgentReview
+
+from services.code_diff import generate_diff
+from services.project_editor import ProjectEditor
 
 from history.chat_history import (
     create_chat,
@@ -19,62 +34,330 @@ from history.chat_history import (
     delete_chat
 )
 
+from ai.prompts import PROMPTS
+
 
 class ChatController:
 
     def __init__(self, app, chat):
-
         self.app = app
         self.chat = chat
 
         self.current_chat = None
-
         self.welcome_cleared = False
 
         self.sidebar = None
+        self.editor = None
+        self.terminal = None
+        self.right_sidebar = None
+
+        self.context_retriever = ContextRetriever()
+        self.ai = AIEngine()
+        self.ai_actions = AIActions(self.ai)
+        self.agent = AIAgent(self.ai)
+        self.project_editor = ProjectEditor()
+
+        self.attached_file = None
+
+    # -------------------------------------------------
+    # Chat UI
+    # -------------------------------------------------
 
     def clear_chat(self):
-
         for widget in self.chat.winfo_children():
             widget.destroy()
 
     def open_chat(self, chat_id):
-
         self.current_chat = chat_id
         self.welcome_cleared = True
 
         self.clear_chat()
 
-        conversation = get_chat(chat_id)
-
-        if conversation is None:
-            create_welcome_card(self.chat)
-            return
-
-        if len(conversation["messages"]) == 0:
-            create_welcome_card(self.chat)
-            return
-
-        for msg in conversation["messages"]:
-
-            if msg["role"] == "user":
-                add_user_bubble(self.chat, msg["text"])
-
-            elif msg["role"] == "assistant":
-                add_ai_bubble(self.chat, msg["text"])
-
     def new_chat(self):
-
         self.current_chat = None
-
         self.welcome_cleared = False
+        self.attached_file = None
 
         self.clear_chat()
-
         create_welcome_card(self.chat)
 
-    def delete_chat(self, chat_id):
+    def attach_file(self):
+        filename = choose_file()
 
+        if not filename:
+            return
+
+        self.attached_file = filename
+        create_attachment_card(self.chat, filename)
+
+    # -------------------------------------------------
+    # AI Helpers
+    # -------------------------------------------------
+
+    def preview_code_change(self, old_code, new_code):
+        diff = generate_diff(old_code, new_code)
+
+        def apply():
+            if self.editor:
+                self.editor.set_text(new_code)
+
+                if self.editor.current_file:
+                    self.editor.save_file()
+
+        DiffViewer(self.app, diff, apply)
+
+    # -------------------------------------------------
+    # Improve Current File
+    # -------------------------------------------------
+
+    def improve_editor_code(self, editor):
+
+        code = editor.get_text()
+
+        if not code.strip():
+            return
+
+        thinking = add_system_bubble(
+            self.chat,
+            "🤖 Future AI is improving your code..."
+        )
+
+        task = None
+
+        if self.right_sidebar:
+            task = self.right_sidebar.start_task(
+                "✨ Improving current file..."
+            )
+
+        self.app.update()
+
+        improved = self.ai_actions.improve_code(code)
+
+        if thinking.winfo_exists():
+            thinking.destroy()
+
+        if task:
+            self.right_sidebar.update_task(
+                task,
+                1.0
+            )
+
+            self.right_sidebar.finish_task(task)
+
+            self.right_sidebar.set_status(
+                "🟢 Ready"
+            )
+
+        if not improved:
+            return
+
+        self.preview_code_change(
+            code,
+            improved
+        )
+
+    # -------------------------------------------------
+    # Command Palette
+    # -------------------------------------------------
+
+    def run_ai_action(self, action):
+        if self.editor is None:
+            return
+
+        code = self.editor.get_text()
+
+        if not code.strip():
+            return
+
+        self.editor.set_status("Future AI is working...")
+        reply = self.ai_actions.run_action(action, code)
+        self.editor.set_status("Ready")
+
+        if not reply:
+            return
+
+        replace_actions = {
+            "improve",
+            "optimize",
+            "clean",
+            "debug",
+            "comments",
+            "async",
+            "refactor",
+            "translate"
+        }
+
+        if action in replace_actions:
+            self.preview_code_change(code, reply)
+        else:
+            add_ai_bubble(self.chat, reply)
+
+    # -------------------------------------------------
+    # Project AI
+    # -------------------------------------------------
+
+    def ask_project_ai(self, question):
+        return self.ai_actions.ask_project(question)
+
+    # -------------------------------------------------
+    # Error Assistant
+    # -------------------------------------------------
+
+    def explain_error(self, error):
+        thinking = add_system_bubble(
+            self.chat,
+            "🤖 Future AI is analyzing the error..."
+        )
+
+        task = None
+
+        if self.right_sidebar:
+            task = self.right_sidebar.start_task(
+                "🐞 Explaining Python error..."
+            )
+
+        self.app.update()
+
+        reply = self.ai_actions.explain_error(error)
+
+        if thinking.winfo_exists():
+            thinking.destroy()
+
+        if not reply:
+            reply = "I couldn't analyze the error."
+
+        add_ai_bubble(
+            self.chat,
+            reply
+        )
+
+        if task:
+            self.right_sidebar.finish_task(task)
+            self.right_sidebar.set_status(
+                "🟢 Ready"
+            )
+
+    # -------------------------------------------------
+    # AI Agent
+    # -------------------------------------------------
+
+    def run_agent(self, request):
+
+        # ----------------------------
+        # Timeline
+        # ----------------------------
+
+        analyze = None
+        plan = None
+        edit = None
+        review = None
+
+        if self.right_sidebar:
+
+            analyze = self.right_sidebar.add_timeline_step(
+                "Analyze request"
+            )
+
+            plan = self.right_sidebar.add_timeline_step(
+                "Plan project changes"
+            )
+
+            edit = self.right_sidebar.add_timeline_step(
+                "Modify project files"
+            )
+
+            review = self.right_sidebar.add_timeline_step(
+                "Review results"
+            )
+
+        # ----------------------------
+        # Analyze
+        # ----------------------------
+
+        if analyze is not None:
+            self.right_sidebar.start_timeline_step(analyze)
+
+        self.app.update()
+
+        if analyze is not None:
+            self.right_sidebar.finish_timeline_step(analyze)
+
+        # ----------------------------
+        # Planning
+        # ----------------------------
+
+        if plan is not None:
+            self.right_sidebar.start_timeline_step(plan)
+
+        self.app.update()
+
+        if plan is not None:
+            self.right_sidebar.finish_timeline_step(plan)
+
+        # ----------------------------
+        # Agent execution
+        # ----------------------------
+
+        results = self.agent.run(request)
+
+        if not results:
+            return
+
+        # ----------------------------
+        # Editing
+        # ----------------------------
+
+        if edit is not None:
+            self.right_sidebar.start_timeline_step(edit)
+
+        self.app.update()
+
+        if edit is not None:
+            self.right_sidebar.finish_timeline_step(edit)
+
+        # ----------------------------
+        # Review
+        # ----------------------------
+
+        if review is not None:
+            self.right_sidebar.start_timeline_step(review)
+
+        AgentReview(
+            self.app,
+            results,
+            self.review_change,
+            self.apply_agent_changes
+        )
+
+        if review is not None:
+            self.right_sidebar.finish_timeline_step(review)
+
+    def review_change(self, result):
+        diff = generate_diff(result["old"], result["new"])
+
+        DiffViewer(self.app, diff, lambda: None)
+
+    def apply_agent_changes(self, results):
+
+        self.project_editor.apply_results(results)
+
+        add_ai_bubble(
+            self.chat,
+            f"✅ Future AI successfully updated {len(results)} file(s)."
+        )
+
+        # Reload current file
+        try:
+            if self.editor and self.editor.current_file:
+                current = self.editor.current_file
+                self.editor.open_file(current)
+        except Exception as e:
+            print("Editor Refresh:", e)
+
+        if self.right_sidebar:
+            self.right_sidebar.set_status("🟢 Ready")
+
+    def delete_chat(self, chat_id):
         answer = messagebox.askyesno(
             "Delete Chat",
             "Delete this conversation?"
@@ -85,19 +368,12 @@ class ChatController:
 
         delete_chat(chat_id)
 
-        # If the deleted chat was open, reset the screen
         if self.current_chat == chat_id:
-
             self.current_chat = None
-
+            self.attached_file = None
             self.clear_chat()
-
             create_welcome_card(self.chat)
-
             self.welcome_cleared = False
-
-        # If a chat before the current one was deleted,
-        # shift the current index down by one.
         elif self.current_chat is not None and chat_id < self.current_chat:
             self.current_chat -= 1
 
@@ -105,7 +381,6 @@ class ChatController:
             self.sidebar.refresh()
 
     def send(self, message_box):
-
         user = message_box.get().strip()
 
         if not user:
@@ -113,34 +388,54 @@ class ChatController:
 
         if not self.welcome_cleared:
             self.clear_chat()
+
+            if hasattr(self, "layout") and hasattr(self.layout, "center"):
+                self.layout.center.show_chat()
+
             self.welcome_cleared = True
 
         add_user_bubble(self.chat, user)
 
         if self.current_chat is None:
-
             self.current_chat = create_chat("New Chat")
-
             if self.sidebar:
                 self.sidebar.refresh()
 
-        add_message(
-            self.current_chat,
-            "user",
-            user
-        )
+        add_message(self.current_chat, "user", user)
 
         chats = load_chats()
 
         if len(chats[self.current_chat]["messages"]) == 1:
-
-            rename_chat(
-                self.current_chat,
-                user
-            )
-
+            rename_chat(self.current_chat, user)
             if self.sidebar:
                 self.sidebar.refresh()
+            chats = load_chats()
+
+        conversation = []
+
+        for msg in chats[self.current_chat]["messages"]:
+            conversation.append({
+                "role": msg["role"],
+                "content": msg["text"]
+            })
+
+        if self.attached_file:
+            file_text = read_file(self.attached_file)
+
+            if file_text:
+                file_text = file_text[:5000]
+                conversation.append({
+                    "role": "system",
+                    "content":
+                        f"The user attached '{os.path.basename(self.attached_file)}'.\n\n"
+                        f"Contents:\n\n{file_text}"
+                })
+            else:
+                conversation.append({
+                    "role": "system",
+                    "content":
+                        f"The attached file '{os.path.basename(self.attached_file)}' could not be read."
+                })
 
         thinking = add_system_bubble(
             self.chat,
@@ -149,27 +444,80 @@ class ChatController:
 
         self.app.update()
 
-        reply = get_response(user)
+        workspace = self.context_retriever.build_context(user)
 
-        if reply is None:
+        for item in workspace:
+            conversation.append({
+                "role": "system",
+                "content":
+                    f"Relevant Project File\n\n"
+                    f"File:\n{item['file']}\n\n"
+                    f"Symbol:\n{item['symbol']}\n\n"
+                    f"Type:\n{item['type']}\n\n"
+                    f"Line:\n{item['line']}\n\n"
+                    f"Code:\n\n{item['content']}"
+            })
 
+        bubble = add_streaming_bubble(self.chat)
+        reply = ""
+        task = None
+
+        if self.right_sidebar:
+            task = self.right_sidebar.start_task(
+                "🤖 Future AI is answering..."
+            )
+
+        try:
+            for chunk in self.ai.stream_chat(conversation):
+                if thinking.winfo_exists():
+                    thinking.destroy()
+
+                bubble.update(chunk)
+                reply += chunk
+
+                if task:
+                    progress = min(len(reply) / 800, 0.95)
+                    self.right_sidebar.update_task(task, progress)
+
+                self.app.update()
+
+            bubble.finish()
+
+            if task:
+                self.right_sidebar.finish_task(task)
+                self.right_sidebar.set_status("🟢 Ready")
+
+        except Exception as e:
+            print("Streaming Error:", e)
+
+            if thinking.winfo_exists():
+                thinking.destroy()
+
+            reply = self.ai.chat(conversation)
+
+            if reply:
+                bubble.update(reply)
+                bubble.finish()
+
+            if task:
+                self.right_sidebar.finish_task(task)
+                self.right_sidebar.set_status("🟢 Ready")
+
+        if not reply:
             answer = simpledialog.askstring(
                 "Teach Future AI",
                 f"What should I answer?\n\n{user}"
             )
 
             if answer:
-                teach(user, answer)
+                self.ai.learn(user, answer)
                 reply = "Thanks! I learned something new."
+                bubble.update(reply)
+                bubble.finish()
             else:
                 reply = "Okay."
-
-        thinking.destroy()
-
-        add_ai_bubble(
-            self.chat,
-            reply
-        )
+                bubble.update(reply)
+                bubble.finish()
 
         add_message(
             self.current_chat,
@@ -178,3 +526,33 @@ class ChatController:
         )
 
         message_box.delete(0, "end")
+
+    # -------------------------------------------------
+    # Open Symbol
+    # -------------------------------------------------
+
+    def open_symbol(self, filename, line):
+
+        if not self.editor:
+            return
+
+        self.editor.open_file(filename)
+
+        try:
+
+            widget = self.editor.editor_widget()
+
+            widget.mark_set(
+                "insert",
+                f"{line}.0"
+            )
+
+            widget.see(
+                f"{line}.0"
+            )
+
+            widget.focus_set()
+
+        except Exception as e:
+
+            print("Open Symbol:", e)
