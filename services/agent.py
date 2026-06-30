@@ -1,138 +1,110 @@
-
 from services.agent_planner import AgentPlanner
 from services.agent_executor import AgentExecutor
 from services.project_editor import ProjectEditor
 from services.project_context import ProjectContext
+from services.agent_brain import AgentBrain
+from services.local_coder import LocalCoder
 
 from projects.project_manager import load_projects
 
 
 class AIAgent:
 
-	def __init__(self, ai):
+    def __init__(self, ai):
 
-		self.ai = ai
+        self.ai = ai
 
-		self.planner = AgentPlanner(ai)
-		self.executor = AgentExecutor(ai, self.planner)
-		self.editor = ProjectEditor()
-		self.context = ProjectContext()
+        self.planner = AgentPlanner(ai)
+        self.executor = AgentExecutor(ai, self.planner)
 
-	# -----------------------------------
-	# Main Entry Point
-	# -----------------------------------
+        self.editor = ProjectEditor()
+        self.context = ProjectContext()
 
-	def run(self, request):
+        self.brain = AgentBrain()
+        self.local = LocalCoder()
 
-		print("\n========== AI AGENT ==========")
-		print("Request:", request)
+    # --------------------------------
 
-		projects = load_projects()
+    def run(self, request):
 
-		print("Projects:", projects)
+        self.brain.remember(request)
 
-		if not projects:
-			print("❌ No projects loaded.")
-			return None
+        projects = load_projects()
 
-		project = projects[0]
+        if not projects:
+            return None
 
-		print("Project:", project["name"])
+        project = projects[0]
 
-		# -----------------------------------
-		# Build searchable index
-		# -----------------------------------
+        self.context.load_project(project)
 
-		print("Building project index...")
+        files = self.executor.execute(request)
 
-		self.context.load_project(project)
+        if not files:
+            return None
 
-		print("✅ Project indexed.")
+        results = []
 
-		# -----------------------------------
-		# Ask planner
-		# -----------------------------------
+        for filename in files:
 
-		print("Planning changes...")
+            full_path = None
 
-		files = self.executor.execute(request)
+            for project_file in project["files"]:
 
-		print("Planner returned:", files)
+                if project_file.endswith(filename):
 
-		if not files:
-			print("❌ Planner returned no files.")
-			return None
+                    full_path = project_file
+                    break
 
-		results = []
+            if full_path is None:
+                continue
 
-		# -----------------------------------
-		# Process each file
-		# -----------------------------------
+            code = self.editor.read(full_path)
 
-		for filename in files:
+            conversation = [
 
-			print("\nProcessing:", filename)
+                {
+                    "role": "system",
+                    "content":
+                    (
+                        "You are an expert software engineer.\n"
+                        "Modify ONLY this file.\n"
+                        "Return ONLY the updated code."
+                    )
+                },
 
-			full_path = None
+                {
+                    "role": "user",
+                    "content":
+                        f"Task:\n{request}\n\n"
+                        f"Filename:\n{filename}\n\n"
+                        f"Code:\n\n{code}"
+                }
 
-			for project_file in project["files"]:
+            ]
 
-				if project_file.endswith(filename):
+            new_code = self.ai.chat(conversation)
 
-					full_path = project_file
-					break
+            # --------------------------------
+            # Local AI Fallback
+            # --------------------------------
 
-			print("Matched path:", full_path)
+            if new_code is None:
 
-			if full_path is None:
-				print("❌ File not found in project.")
-				continue
+                print("Using LocalCoder...")
 
-			code = self.editor.read(full_path)
+                new_code = self.local.generate(
+                    request,
+                    filename,
+                    code
+                )
 
-			print("Characters read:", len(code))
+            results.append({
 
-			conversation = [
+                "filename": full_path,
+                "old": code,
+                "new": new_code
 
-				{
-					"role": "system",
-					"content":
-					(
-						"You are an expert software engineer.\n"
-						"Modify ONLY this file.\n"
-						"Return ONLY the updated code."
-					)
-				},
+            })
 
-				{
-					"role": "user",
-					"content":
-						f"Task:\n{request}\n\n"
-						f"Filename:\n{filename}\n\n"
-						f"Code:\n\n{code}"
-				}
-
-			]
-
-			print("Sending request to AI...")
-
-			new_code = self.ai.chat(conversation)
-
-			if new_code is None:
-				print("❌ AI returned None.")
-				continue
-
-			print("✅ AI returned", len(new_code), "characters.")
-
-			results.append({
-
-				"filename": full_path,
-				"old": code,
-				"new": new_code
-
-			})
-
-		print("\nResults created:", len(results))
-		print("========== DONE ==========" ,"\n")
-
-		return results
+        return results

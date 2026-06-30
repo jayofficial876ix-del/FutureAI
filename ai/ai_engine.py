@@ -2,6 +2,7 @@ from ai.config import AI_PROVIDER
 
 from ai.providers.local_provider import LocalProvider
 from ai.providers.openai_provider import OpenAIProvider
+from ai.providers.ollama_provider import OllamaProvider
 
 
 class AIEngine:
@@ -9,35 +10,60 @@ class AIEngine:
     def __init__(self):
 
         self.local = LocalProvider()
+        self.ollama = OllamaProvider()
 
         if AI_PROVIDER == "openai":
+
             self.provider = OpenAIProvider()
+
+        elif AI_PROVIDER == "ollama":
+
+            self.provider = self.ollama
+
         else:
+
             self.provider = self.local
 
     # -------------------------------------------------
-    # Normal Chat (existing)
+    # Normal Chat
     # -------------------------------------------------
 
     def chat(self, conversation):
 
         reply = self.provider.chat(conversation)
 
-        if reply is None:
+        if reply is not None:
+            return reply
 
-            print("Falling back to Local AI...")
+        print("Provider failed.")
 
-            reply = self.local.chat(conversation)
+        # ---------------------------------------------
+        # Fallback to Ollama
+        # ---------------------------------------------
 
-        return reply
+        if self.provider != self.ollama:
+
+            print("Falling back to Ollama...")
+
+            reply = self.ollama.chat(conversation)
+
+            if reply is not None:
+                return reply
+
+        # ---------------------------------------------
+        # Final fallback
+        # ---------------------------------------------
+
+        print("Falling back to Local AI...")
+
+        return self.local.chat(conversation)
 
     # -------------------------------------------------
-    # Streaming Chat (NEW)
+    # Streaming Chat
     # -------------------------------------------------
 
     def stream_chat(self, conversation):
 
-        # Provider supports native streaming
         if hasattr(self.provider, "stream_chat"):
 
             try:
@@ -51,10 +77,6 @@ class AIEngine:
             except Exception:
 
                 print("Streaming failed.")
-
-        # ---------------------------------------------
-        # Fallback
-        # ---------------------------------------------
 
         reply = self.chat(conversation)
 

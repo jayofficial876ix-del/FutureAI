@@ -6,7 +6,10 @@ from services.file_service import (
     save_text_file
 )
 
-from gui.inline_prompt import InlinePrompt
+from services.autocomplete import AutoCompleteService
+from ai.ai_engine import AIEngine
+
+from gui.ghost_text import GhostText
 from gui.editor_tabs import EditorTabs
 from gui.editor_view import EditorView
 
@@ -16,20 +19,27 @@ class CodeEditor:
     def __init__(self, parent):
 
         self.current_file = None
-
         self.open_files = {}
-
         self.dirty_files = set()
 
         self.frame = ctk.CTkFrame(parent)
 
         # -------------------------
+        # AI Autocomplete
+        # -------------------------
+
+        self.autocomplete = AutoCompleteService(
+            AIEngine()
+        )
+
+        self.autocomplete_job = None
+        self.ghost_text = ""
+
+        # -------------------------
         # Tabs
         # -------------------------
 
-        self.tabs = EditorTabs(
-            self.frame
-        )
+        self.tabs = EditorTabs(self.frame)
 
         self.tabs.pack(
             fill="x",
@@ -75,9 +85,7 @@ class CodeEditor:
             command=self.save_file
         )
 
-        self.save_button.pack(
-            side="right"
-        )
+        self.save_button.pack(side="right")
 
         # -------------------------
         # Status
@@ -100,9 +108,7 @@ class CodeEditor:
         # Editor
         # -------------------------
 
-        self.editor_view = EditorView(
-            self.frame
-        )
+        self.editor_view = EditorView(self.frame)
 
         self.editor_view.pack(
             fill="both",
@@ -111,7 +117,9 @@ class CodeEditor:
             pady=10
         )
 
-        # Detect typing
+        self.ghost = GhostText(
+            self.editor_view.widget()
+        )
 
         widget = self.editor_view.widget()
 
@@ -121,8 +129,13 @@ class CodeEditor:
         )
 
         widget.bind(
-            "<Control-i>",
-            self.inline_ai
+            "<KeyRelease>",
+            self._on_key_release
+        )
+
+        widget.bind(
+            "<Tab>",
+            self._accept_completion
         )
 
     # --------------------------------
@@ -152,6 +165,74 @@ class CodeEditor:
 
     # --------------------------------
 
+    def _on_key_release(self, event):
+
+        if self.ghost.has_suggestion():
+            self.ghost.clear()
+
+        if self.autocomplete_job:
+            self.frame.after_cancel(
+                self.autocomplete_job
+            )
+
+        self.autocomplete_job = self.frame.after(
+            500,
+            self.request_completion
+        )
+
+    # --------------------------------
+
+    def request_completion(self):
+
+        code = self.get_text()
+
+        if len(code.strip()) < 10:
+            return
+
+        self.set_status(
+            "🤖 Thinking..."
+        )
+
+        self.autocomplete.complete(
+            code,
+            self.show_completion
+        )
+
+    # --------------------------------
+
+    def show_completion(self, suggestion):
+
+        self.ghost_text = suggestion
+
+        self.frame.after(
+            0,
+            lambda: (
+                self.ghost.show(suggestion),
+                self.set_status(
+                    "💡 Suggestion ready (Tab)"
+                )
+            )
+        )
+
+    # --------------------------------
+
+    def _accept_completion(self, event=None):
+
+        if not self.ghost.has_suggestion():
+            return
+
+        self.ghost.accept()
+
+        self.ghost_text = ""
+
+        self.set_status(
+            "Suggestion accepted ✓"
+        )
+
+        return "break"
+
+    # --------------------------------
+
     def pack(self, **kwargs):
 
         self.frame.pack(**kwargs)
@@ -161,16 +242,13 @@ class CodeEditor:
     def open_file(self, filename):
 
         if self.current_file:
-
             self.open_files[
                 self.current_file
             ] = self.get_text()
 
         self.current_file = filename
 
-        short = os.path.basename(
-            filename
-        )
+        short = os.path.basename(filename)
 
         self.tabs.add_tab(filename)
 
@@ -178,18 +256,13 @@ class CodeEditor:
             text=short
         )
 
-        self.set_status(
-            "Opening..."
-        )
+        self.set_status("Opening...")
 
         if filename in self.open_files:
-
             text = self.open_files[
                 filename
             ]
-
         else:
-
             text = load_text_file(
                 filename
             )
@@ -236,9 +309,7 @@ class CodeEditor:
             False
         )
 
-        self.set_status(
-            "Saved ✓"
-        )
+        self.set_status("Saved ✓")
 
     # --------------------------------
 
@@ -267,16 +338,42 @@ class CodeEditor:
     def set_text(self, text):
 
         self.editor_view.set(text)
-
-        widget = self.editor_view.widget()
-
-        widget.edit_modified(False)
+        self.editor_view.widget().edit_modified(False)
 
     # --------------------------------
 
     def editor_widget(self):
 
         return self.editor_view.widget()
+
+    # --------------------------------
+
+    def get_selected_text(self):
+
+        try:
+            return self.editor_widget().get(
+                "sel.first",
+                "sel.last"
+            )
+        except Exception:
+            return ""
+
+    # --------------------------------
+
+    def replace_selected_text(self, text):
+
+        try:
+            widget = self.editor_widget()
+            widget.delete(
+                "sel.first",
+                "sel.last"
+            )
+            widget.insert(
+                "insert",
+                text
+            )
+        except Exception:
+            pass
 
     # --------------------------------
 
@@ -290,99 +387,4 @@ class CodeEditor:
 
         self.editor_view.clear()
 
-        self.set_status(
-            "Ready"
-        )
-
-    # --------------------------------
-
-    def inline_ai(self, event=None):
-
-        widget = self.editor_view.widget()
-
-        try:
-            selected = widget.get(
-                "sel.first",
-                "sel.last"
-            )
-        except Exception:
-            self.set_status(
-                "Select some code first."
-            )
-            return
-
-        InlinePrompt(
-            widget.winfo_toplevel(),
-            lambda prompt: self.run_inline_ai(
-                selected,
-                prompt
-            )
-        )
-
-    # --------------------------------
-
-    def run_inline_ai(self, selected_code, prompt):
-
-        self.set_status(
-            "Future AI is editing..."
-        )
-
-        if not hasattr(self, "ai_actions"):
-
-            self.set_status(
-                "AI is not connected."
-            )
-
-            return
-
-        new_code = self.ai_actions.inline_edit(
-            selected_code,
-            prompt
-        )
-
-        if not new_code:
-
-            self.set_status(
-                "AI failed."
-            )
-
-            return
-
-        from services.code_diff import generate_diff
-        from gui.diff_viewer import DiffViewer
-
-        diff = generate_diff(
-            selected_code,
-            new_code
-        )
-
-        widget = self.editor_view.widget()
-
-        def apply():
-
-            try:
-                widget.delete(
-                    "sel.first",
-                    "sel.last"
-                )
-
-                widget.insert(
-                    "insert",
-                    new_code
-                )
-
-                self.set_status(
-                    "Inline edit complete ✓"
-                )
-
-            except Exception:
-
-                self.set_status(
-                    "Couldn't replace selection."
-                )
-
-        DiffViewer(
-            widget.winfo_toplevel(),
-            diff,
-            apply
-        )
+        self.set_status("Ready")

@@ -1,2 +1,2 @@
-AI_PROVIDER = "openai"
+AI_PROVIDER = "ollama"
 

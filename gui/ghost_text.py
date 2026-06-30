@@ -3,11 +3,18 @@ class GhostText:
     def __init__(self, editor):
 
         self.editor = editor
+
         self.suggestion = ""
 
-        self.editor.tag_config(
+        self.start = None
+        self.end = None
+
+        self.editor.tag_configure(
+
             "ghost",
+
             foreground="#666666"
+
         )
 
     # --------------------------------
@@ -21,17 +28,33 @@ class GhostText:
 
         self.suggestion = text
 
-        index = self.editor.index("insert")
-
-        self.editor.insert(
-            index,
-            text,
-            "ghost"
+        self.start = self.editor.index(
+            "insert"
         )
 
+        self.editor.insert(
+
+            self.start,
+
+            text,
+
+            "ghost"
+
+        )
+
+        self.end = self.editor.index(
+
+            f"{self.start}+{len(text)}c"
+
+        )
+
+        # Put the cursor back where it was
         self.editor.mark_set(
+
             "insert",
-            index
+
+            self.start
+
         )
 
     # --------------------------------
@@ -41,21 +64,24 @@ class GhostText:
         if not self.suggestion:
             return
 
-        start = self.editor.index("insert")
-
-        end = f"{start}+{len(self.suggestion)}c"
-
         try:
 
             self.editor.delete(
-                start,
-                end
+
+                self.start,
+
+                self.end
+
             )
 
         except Exception:
+
             pass
 
         self.suggestion = ""
+
+        self.start = None
+        self.end = None
 
     # --------------------------------
 
@@ -64,19 +90,31 @@ class GhostText:
         if not self.suggestion:
             return
 
-        index = self.editor.index("insert")
-
-        end = f"{index}+{len(self.suggestion)}c"
-
         self.editor.tag_remove(
+
             "ghost",
-            index,
-            end
+
+            self.start,
+
+            self.end
+
         )
 
         self.editor.mark_set(
+
             "insert",
-            end
+
+            self.end
+
         )
 
         self.suggestion = ""
+
+        self.start = None
+        self.end = None
+
+    # --------------------------------
+
+    def has_suggestion(self):
+
+        return bool(self.suggestion)

@@ -7,34 +7,89 @@ class TaskTimeline(ctk.CTkFrame):
 
         super().__init__(parent)
 
-        self.items = []
+        self.items = {}
+
+    # -------------------------
 
     def add_step(self, text):
 
-        label = ctk.CTkLabel(
+        row = ctk.CTkFrame(
             self,
-            text="⬜ " + text,
+            fg_color="transparent"
+        )
+
+        row.pack(
+            fill="x",
+            pady=2
+        )
+
+        icon = ctk.CTkLabel(
+            row,
+            text="⬜",
+            width=30
+        )
+
+        icon.pack(
+            side="left"
+        )
+
+        label = ctk.CTkLabel(
+            row,
+            text=text,
             anchor="w"
         )
 
         label.pack(
+            side="left",
             fill="x",
-            padx=8,
-            pady=2
+            expand=True
         )
 
-        self.items.append(label)
+        self.items[text] = (icon, label)
 
-        return len(self.items) - 1
+        return text
 
-    def running(self, index):
+    # -------------------------
 
-        self.items[index].configure(
-            text="⏳ " + self.items[index].cget("text")[2:]
+    def running(self, step):
+
+        icon, _ = self.items[step]
+
+        icon.configure(
+            text="⏳"
         )
 
-    def finish(self, index):
+        self.update()
 
-        self.items[index].configure(
-            text="✔ " + self.items[index].cget("text")[2:]
+    # -------------------------
+
+    def finish(self, step):
+
+        icon, _ = self.items[step]
+
+        icon.configure(
+            text="✔"
         )
+
+        self.update()
+
+    # -------------------------
+
+    def error(self, step):
+
+        icon, _ = self.items[step]
+
+        icon.configure(
+            text="❌"
+        )
+
+        self.update()
+
+    # -------------------------
+
+    def clear(self):
+
+        for widget in self.winfo_children():
+            widget.destroy()
+
+        self.items.clear()

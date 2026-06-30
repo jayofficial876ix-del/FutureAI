@@ -236,3 +236,34 @@ class EditorPanel(ctk.CTkFrame):
         self.terminal.run_python(
             editor.current_file
         )
+
+    # --------------------------------
+
+    def get_selected_text(self):
+
+        return self.editor.active_editor().get_selected_text()
+
+    # --------------------------------
+
+    def replace_selected_text(self, text):
+
+        self.editor.active_editor().replace_selected_text(text)
+
+    # --------------------------------
+
+    def get_text(self):
+
+        return self.editor.active_editor().get_text()
+
+    # --------------------------------
+
+    def set_text(self, text):
+
+        self.editor.active_editor().set_text(text)
+
+    # --------------------------------
+
+    @property
+    def current_file(self):
+
+        return self.editor.active_editor().current_file

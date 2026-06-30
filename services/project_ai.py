@@ -6,21 +6,34 @@ def build_project_conversation(project, question):
     context = build_project_context(project)
 
     return [
+
         {
             "role": "system",
-            "content": (
+            "content":
+            (
+                "You are Future AI.\n"
                 "You are an expert software engineer.\n"
-                "Answer questions about the user's entire project.\n"
-                "Use the supplied project files as your source of truth.\n"
-                "If the answer cannot be found, clearly say so."
+                "You are assisting with the user's software project.\n"
+                "Use ONLY the supplied project context when answering questions.\n"
+                "If information is missing, say you cannot find it.\n"
+                "Do not invent files or functions.\n"
+                "Keep answers concise and technical."
             )
         },
+
         {
             "role": "system",
-            "content": context
+            "content":
+            (
+                "PROJECT CONTEXT\n"
+                "================\n\n"
+                f"{context}"
+            )
         },
+
         {
             "role": "user",
             "content": question
         }
+
     ]

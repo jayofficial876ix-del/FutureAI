@@ -1,3 +1,5 @@
+from gui.inline_prompt import InlinePrompt
+from gui.diff_viewer import DiffViewer
 from projects.project_manager import load_projects
 from services.context_retriever import ContextRetriever
 from tkinter import simpledialog, messagebox
@@ -19,7 +21,6 @@ from gui.message_bubble import (
 
 from gui.attachment_card import create_attachment_card
 from gui.chat_view import create_welcome_card
-from gui.diff_viewer import DiffViewer
 from gui.agent_review import AgentReview
 
 from services.code_diff import generate_diff
@@ -95,16 +96,33 @@ class ChatController:
     # -------------------------------------------------
 
     def preview_code_change(self, old_code, new_code):
-        diff = generate_diff(old_code, new_code)
 
-        def apply():
-            if self.editor:
-                self.editor.set_text(new_code)
+        result = {
+            "filename": (
+                self.editor.current_file
+                if self.editor
+                else "Untitled"
+            ),
+            "old": old_code,
+            "new": new_code
+        }
 
-                if self.editor.current_file:
-                    self.editor.save_file()
+        def apply(updated):
+            if not self.editor:
+                return
 
-        DiffViewer(self.app, diff, apply)
+            self.editor.set_text(
+                updated["new"]
+            )
+
+            if self.editor.current_file:
+                self.editor.save_file()
+
+        DiffViewer(
+            self.app,
+            result,
+            apply
+        )
 
     # -------------------------------------------------
     # Improve Current File
@@ -241,86 +259,179 @@ class ChatController:
     # AI Agent
     # -------------------------------------------------
 
+    def inline_ai(self, event=None):
+
+        if not self.editor:
+            return
+
+        InlinePrompt(
+            self.app,
+            self.run_inline_ai
+        )
+
+    def run_inline_ai(self, prompt):
+
+        if not self.editor:
+            return
+
+        selected = self.editor.get_selected_text()
+
+        if not selected:
+
+            messagebox.showinfo(
+                "Future AI",
+                "Please select some code first."
+            )
+
+            return
+
+        self.right_sidebar.set_status(
+            "🤖 Editing selection..."
+        )
+
+        conversation = [
+
+            {
+                "role": "system",
+                "content":
+                (
+                    "You are an expert software engineer.\n"
+                    "Modify ONLY the selected code.\n"
+                    "Return ONLY the updated code."
+                )
+            },
+
+            {
+                "role": "user",
+                "content":
+                    f"Instruction:\n{prompt}\n\n"
+                    f"Selected Code:\n\n{selected}"
+            }
+
+        ]
+
+        new_code = self.ai.chat(conversation)
+
+        self.right_sidebar.set_status("🟢 Ready")
+
+        if not new_code:
+            return
+
+        result = {
+
+            "filename": self.editor.current_file,
+
+            "old": selected,
+
+            "new": new_code
+
+        }
+
+        def apply(updated):
+
+            self.editor.replace_selected_text(
+                updated["new"]
+            )
+
+            self.editor.save_file()
+
+        DiffViewer(
+
+            self.app,
+
+            result,
+
+            apply
+
+        )
+
     def run_agent(self, request):
 
-        # ----------------------------
-        # Timeline
-        # ----------------------------
+        if not self.right_sidebar:
+            return
 
-        analyze = None
-        plan = None
-        edit = None
-        review = None
+        # --------------------------------
+        # Reset Timeline
+        # --------------------------------
 
-        if self.right_sidebar:
+        self.right_sidebar.tasks.timeline.clear()
 
-            analyze = self.right_sidebar.add_timeline_step(
-                "Analyze request"
-            )
+        analyze = self.right_sidebar.tasks.timeline.add_step(
+            "Analyze Request"
+        )
 
-            plan = self.right_sidebar.add_timeline_step(
-                "Plan project changes"
-            )
+        index = self.right_sidebar.tasks.timeline.add_step(
+            "Index Project"
+        )
 
-            edit = self.right_sidebar.add_timeline_step(
-                "Modify project files"
-            )
+        plan = self.right_sidebar.tasks.timeline.add_step(
+            "Plan Changes"
+        )
 
-            review = self.right_sidebar.add_timeline_step(
-                "Review results"
-            )
+        edit = self.right_sidebar.tasks.timeline.add_step(
+            "Generate Code"
+        )
 
-        # ----------------------------
+        review = self.right_sidebar.tasks.timeline.add_step(
+            "Review Changes"
+        )
+
+        apply = self.right_sidebar.tasks.timeline.add_step(
+            "Apply Changes"
+        )
+
+        finished = self.right_sidebar.tasks.timeline.add_step(
+            "Finished"
+        )
+
+        # --------------------------------
         # Analyze
-        # ----------------------------
+        # --------------------------------
 
-        if analyze is not None:
-            self.right_sidebar.start_timeline_step(analyze)
-
+        self.right_sidebar.tasks.timeline.running(analyze)
         self.app.update()
 
-        if analyze is not None:
-            self.right_sidebar.finish_timeline_step(analyze)
+        self.right_sidebar.tasks.timeline.finish(analyze)
 
-        # ----------------------------
-        # Planning
-        # ----------------------------
+        # --------------------------------
+        # Index
+        # --------------------------------
 
-        if plan is not None:
-            self.right_sidebar.start_timeline_step(plan)
-
+        self.right_sidebar.tasks.timeline.running(index)
         self.app.update()
 
-        if plan is not None:
-            self.right_sidebar.finish_timeline_step(plan)
+        self.right_sidebar.tasks.timeline.finish(index)
 
-        # ----------------------------
-        # Agent execution
-        # ----------------------------
+        # --------------------------------
+        # Plan
+        # --------------------------------
+
+        self.right_sidebar.tasks.timeline.running(plan)
+        self.app.update()
 
         results = self.agent.run(request)
 
         if not results:
+            self.right_sidebar.tasks.timeline.error(plan)
             return
 
-        # ----------------------------
-        # Editing
-        # ----------------------------
+        self.right_sidebar.tasks.timeline.finish(plan)
 
-        if edit is not None:
-            self.right_sidebar.start_timeline_step(edit)
+        # --------------------------------
+        # Generate
+        # --------------------------------
 
+        self.right_sidebar.tasks.timeline.running(edit)
         self.app.update()
 
-        if edit is not None:
-            self.right_sidebar.finish_timeline_step(edit)
+        self.right_sidebar.tasks.timeline.finish(edit)
 
-        # ----------------------------
+        # --------------------------------
         # Review
-        # ----------------------------
+        # --------------------------------
 
-        if review is not None:
-            self.right_sidebar.start_timeline_step(review)
+        self.right_sidebar.tasks.timeline.running(review)
+        self.app.update()
 
         AgentReview(
             self.app,
@@ -329,24 +440,48 @@ class ChatController:
             self.apply_agent_changes
         )
 
-        if review is not None:
-            self.right_sidebar.finish_timeline_step(review)
+        self.right_sidebar.tasks.timeline.finish(review)
+
+        # --------------------------------
+        # Apply
+        # --------------------------------
+
+        self.right_sidebar.tasks.timeline.running(apply)
+        self.app.update()
+
+        self.right_sidebar.tasks.timeline.finish(apply)
+
+        # --------------------------------
+        # Done
+        # --------------------------------
+
+        self.right_sidebar.tasks.timeline.running(finished)
+        self.app.update()
+
+        self.right_sidebar.tasks.timeline.finish(finished)
+
+        self.right_sidebar.set_status("🟢 Ready")
 
     def review_change(self, result):
-        diff = generate_diff(result["old"], result["new"])
-
-        DiffViewer(self.app, diff, lambda: None)
+        DiffViewer(
+            self.app,
+            result,
+            lambda updated: self.project_editor.apply_results([updated])
+        )
 
     def apply_agent_changes(self, results):
-
-        self.project_editor.apply_results(results)
+        for result in results:
+            DiffViewer(
+                self.app,
+                result,
+                lambda updated: self.project_editor.apply_results([updated])
+            )
 
         add_ai_bubble(
             self.chat,
             f"✅ Future AI successfully updated {len(results)} file(s)."
         )
 
-        # Reload current file
         try:
             if self.editor and self.editor.current_file:
                 current = self.editor.current_file
@@ -539,7 +674,6 @@ class ChatController:
         self.editor.open_file(filename)
 
         try:
-
             widget = self.editor.editor_widget()
 
             widget.mark_set(
@@ -554,5 +688,4 @@ class ChatController:
             widget.focus_set()
 
         except Exception as e:
-
             print("Open Symbol:", e)

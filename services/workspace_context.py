@@ -7,37 +7,43 @@ class WorkspaceContext:
         self,
         editor,
         terminal=None,
-        open_files=None
+        open_files=None,
+        git=None
     ):
 
         context = []
 
-        # -----------------------
+        # --------------------------------
         # Current File
-        # -----------------------
+        # --------------------------------
 
-        if editor.current_file:
+        if getattr(editor, "current_file", None):
 
             context.append({
 
                 "role": "system",
 
                 "content":
-                    f"Current file: "
-                    f"{os.path.basename(editor.current_file)}\n\n"
-                    f"{editor.get_text()}"
+                    (
+                        f"Current file:\n"
+                        f"{os.path.basename(editor.current_file)}\n\n"
+                        f"{editor.get_text()}"
+                    )
 
             })
 
-        # -----------------------
+        # --------------------------------
         # Open Files
-        # -----------------------
+        # --------------------------------
 
         if open_files:
 
             names = [
+
                 os.path.basename(f)
+
                 for f in open_files
+
             ]
 
             context.append({
@@ -45,14 +51,16 @@ class WorkspaceContext:
                 "role": "system",
 
                 "content":
-                    "Open files:\n"
-                    + "\n".join(names)
+                    (
+                        "Open files:\n\n"
+                        + "\n".join(names)
+                    )
 
             })
 
-        # -----------------------
+        # --------------------------------
         # Selected Code
-        # -----------------------
+        # --------------------------------
 
         try:
 
@@ -63,15 +71,17 @@ class WorkspaceContext:
                 "sel.last"
             )
 
-            if selected:
+            if selected.strip():
 
                 context.append({
 
                     "role": "system",
 
                     "content":
-                        "Selected code:\n\n"
-                        + selected
+                        (
+                            "Selected code:\n\n"
+                            + selected
+                        )
 
                 })
 
@@ -79,9 +89,9 @@ class WorkspaceContext:
 
             pass
 
-        # -----------------------
-        # Terminal
-        # -----------------------
+        # --------------------------------
+        # Terminal Output
+        # --------------------------------
 
         if terminal:
 
@@ -96,8 +106,46 @@ class WorkspaceContext:
                         "role": "system",
 
                         "content":
-                            "Recent terminal output:\n\n"
-                            + output[-4000:]
+                            (
+                                "Recent terminal output:\n\n"
+                                + output[-4000:]
+                            )
+
+                    })
+
+            except Exception:
+
+                pass
+
+        # --------------------------------
+        # Git Status
+        # --------------------------------
+
+        if git:
+
+            try:
+
+                changes = git.changed_files()
+
+                if changes:
+
+                    lines = [
+
+                        f"{status}  {filename}"
+
+                        for status, filename in changes
+
+                    ]
+
+                    context.append({
+
+                        "role": "system",
+
+                        "content":
+                            (
+                                "Git changes:\n\n"
+                                + "\n".join(lines)
+                            )
 
                     })
 

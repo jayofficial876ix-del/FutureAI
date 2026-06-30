@@ -1,7 +1,7 @@
 import customtkinter as ctk
 
 from gui.ai_tasks import AITasks
-from gui.task_timeline import TaskTimeline
+from gui.source_control import SourceControl
 
 
 class RightSidebar(ctk.CTkFrame):
@@ -32,68 +32,28 @@ class RightSidebar(ctk.CTkFrame):
         )
 
         # --------------------------------
-        # AI Tools
-        # --------------------------------
-
-        self.section(
-            "🤖 AI Tools",
-            [
-                "AI Agent",
-                "Command Palette",
-                "Explain Error",
-                "Improve Code"
-            ]
-        )
-
-        # --------------------------------
-        # Project
-        # --------------------------------
-
-        self.section(
-            "📁 Project",
-            [
-                "Explorer",
-                "Quick Open",
-                "Global Search"
-            ]
-        )
-
-        # --------------------------------
-        # Memory
-        # --------------------------------
-
-        self.section(
-            "🧠 Memory",
-            [
-                "Recent Chats",
-                "Recent Files",
-                "Bookmarks"
-            ]
-        )
-
-        # --------------------------------
-        # AI Timeline
-        # --------------------------------
-
-        self.timeline = TaskTimeline(self)
-
-        self.timeline.pack(
-            fill="x",
-            padx=15,
-            pady=(10, 5)
-        )
-
-        # --------------------------------
         # AI Tasks
         # --------------------------------
 
         self.tasks = AITasks(self)
 
         self.tasks.pack(
+            fill="x",
+            padx=15,
+            pady=(0, 15)
+        )
+
+        # --------------------------------
+        # Source Control
+        # --------------------------------
+
+        self.git = SourceControl(self)
+
+        self.git.pack(
             fill="both",
             expand=True,
             padx=15,
-            pady=(5, 10)
+            pady=(0, 15)
         )
 
         # --------------------------------
@@ -136,46 +96,6 @@ class RightSidebar(ctk.CTkFrame):
         )
 
     # --------------------------------
-    # Section Builder
-    # --------------------------------
-
-    def section(self, title, items):
-
-        frame = ctk.CTkFrame(self)
-
-        frame.pack(
-            fill="x",
-            padx=15,
-            pady=8
-        )
-
-        ctk.CTkLabel(
-            frame,
-            text=title,
-            font=("Segoe UI", 16, "bold")
-        ).pack(
-            anchor="w",
-            padx=12,
-            pady=(10, 5)
-        )
-
-        for item in items:
-
-            ctk.CTkButton(
-                frame,
-                text=item,
-                anchor="w",
-                fg_color="transparent",
-                hover_color="#2A2A2A"
-            ).pack(
-                fill="x",
-                padx=8,
-                pady=2
-            )
-
-    # --------------------------------
-    # Status
-    # --------------------------------
 
     def set_status(self, text):
 
@@ -201,19 +121,3 @@ class RightSidebar(ctk.CTkFrame):
     def finish_task(self, task):
 
         self.tasks.finish_task(task)
-
-    # --------------------------------
-    # Timeline API
-    # --------------------------------
-
-    def add_timeline_step(self, text):
-
-        return self.timeline.add_step(text)
-
-    def start_timeline_step(self, step):
-
-        self.timeline.running(step)
-
-    def finish_timeline_step(self, step):
-
-        self.timeline.finish(step)

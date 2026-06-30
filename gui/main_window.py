@@ -10,72 +10,82 @@ from projects.project_manager import current_project_path
 
 def start_gui():
 
-	ctk.set_appearance_mode("dark")
-	ctk.set_default_color_theme("blue")
+    ctk.set_appearance_mode("dark")
+    ctk.set_default_color_theme("blue")
 
-	app = ctk.CTk()
+    app = ctk.CTk()
 
-	app.title("🤖 Future AI")
-	app.geometry("1800x1000")
+    app.title("🤖 Future AI")
+    app.geometry("1800x1000")
 
-	# --------------------------------
-	# Controller
-	# --------------------------------
+    # --------------------------------
+    # Controller
+    # --------------------------------
 
-	controller = ChatController(
-		app,
-		None
-	)
+    controller = ChatController(
+        app,
+        None
+    )
 
-	# --------------------------------
-	# Main Layout
-	# --------------------------------
+    # --------------------------------
+    # Main Layout
+    # --------------------------------
 
-	layout = AppLayout(
-		app,
-		controller
-	)
+    layout = AppLayout(
+        app,
+        controller
+    )
 
-	controller.layout = layout
+    controller.layout = layout
 
-	# --------------------------------
-	# Ctrl + T
-	# Go To Symbol
-	# --------------------------------
+    # --------------------------------
+    # Ctrl + T
+    # Go To Symbol
+    # --------------------------------
 
-	def open_symbol_search(event=None):
+    def open_symbol_search(event=None):
 
-		SymbolSearch(
-			app,
-			controller.open_symbol
-		)
+        SymbolSearch(
+            app,
+            controller.open_symbol
+        )
 
-	app.bind_all(
-		"<Control-t>",
-		open_symbol_search
-	)
+    app.bind_all(
+        "<Control-t>",
+        open_symbol_search
+    )
 
-	# --------------------------------
-	# Ctrl + P
-	# Quick Open
-	# --------------------------------
+    # --------------------------------
+    # Ctrl + P
+    # Quick Open
+    # --------------------------------
 
-	def quick_open(event=None):
+    def quick_open(event=None):
 
-		project = current_project_path()
+        project = current_project_path()
 
-		if not project:
-			return
+        if not project:
+            return
 
-		QuickOpen(
-			app,
-			project,
-			layout.editor.open_file
-		)
+        QuickOpen(
+            app,
+            project,
+            layout.editor.open_file
+        )
 
-	app.bind_all(
-		"<Control-p>",
-		quick_open
-	)
+    app.bind_all(
+        "<Control-p>",
+        quick_open
+    )
 
-	app.mainloop()
+    # --------------------------------
+    # Ctrl + K
+    # Inline AI
+    # --------------------------------
+
+    app.bind_all(
+        "<Control-k>",
+        controller.inline_ai
+    )
+
+    app.mainloop()

@@ -3,8 +3,21 @@ import json
 
 from services.folder_importer import import_folder
 
-PROJECTS_FILE = "projects/projects.json"
+# --------------------------------
+# Paths
+# --------------------------------
 
+BASE_DIR = os.path.dirname(
+    os.path.dirname(
+        os.path.abspath(__file__)
+    )
+)
+
+PROJECTS_FILE = os.path.join(
+    BASE_DIR,
+    "projects",
+    "projects.json"
+)
 
 # --------------------------------
 # Load Projects
@@ -12,14 +25,13 @@ PROJECTS_FILE = "projects/projects.json"
 
 def load_projects():
 
-    print("\n========== LOAD PROJECTS ==========")
+    print("\n========== LOAD PROJECTS ========== ")
+
     print("Current Working Directory:")
     print(os.getcwd())
 
-    absolute_path = os.path.abspath(PROJECTS_FILE)
-
     print("\nProjects File:")
-    print(absolute_path)
+    print(PROJECTS_FILE)
 
     exists = os.path.exists(PROJECTS_FILE)
 
@@ -27,8 +39,10 @@ def load_projects():
     print(exists)
 
     if not exists:
+
         print("\n❌ projects.json not found.")
         print("===================================\n")
+
         return []
 
     try:
@@ -64,7 +78,7 @@ def load_projects():
 def save_projects(projects):
 
     os.makedirs(
-        "projects",
+        os.path.dirname(PROJECTS_FILE),
         exist_ok=True
     )
 
@@ -92,6 +106,7 @@ def create_project(name):
     projects.append({
 
         "name": name,
+        "path": "",
         "files": []
 
     })
@@ -168,6 +183,15 @@ def import_project():
 
     projects = load_projects()
 
+    # Don't import the same project twice
+    for existing in projects:
+
+        if existing.get("path") == project["path"]:
+
+            print("Project already imported.")
+
+            return existing
+
     projects.append(project)
 
     save_projects(projects)
@@ -186,9 +210,18 @@ def current_project_path():
     if not projects:
         return None
 
-    project = projects[0]
+    return projects[0].get("path")
 
-    if isinstance(project, dict):
-        return project.get("path")
 
-    return project
+# --------------------------------
+# Current Project
+# --------------------------------
+
+def current_project():
+
+    projects = load_projects()
+
+    if not projects:
+        return None
+
+    return projects[0]
