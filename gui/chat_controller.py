@@ -2,7 +2,7 @@ from gui.inline_prompt import InlinePrompt
 from gui.diff_viewer import DiffViewer
 from projects.project_manager import load_projects
 from services.context_retriever import ContextRetriever
-from tkinter import simpledialog, messagebox
+from tkinter import simpledialog
 import os
 
 from services.file_manager import choose_file
@@ -25,14 +25,14 @@ from gui.agent_review import AgentReview
 
 from services.code_diff import generate_diff
 from services.project_editor import ProjectEditor
+from controllers.chat_history_controller import ChatHistoryController
 
 from history.chat_history import (
     create_chat,
     add_message,
     rename_chat,
     load_chats,
-    get_chat,
-    delete_chat
+    get_chat
 )
 
 from ai.prompts import PROMPTS
@@ -57,6 +57,7 @@ class ChatController:
         self.ai_actions = AIActions(self.ai)
         self.agent = AIAgent(self.ai)
         self.project_editor = ProjectEditor()
+        self.history = ChatHistoryController(self)
 
         self.attached_file = None
 
@@ -65,22 +66,13 @@ class ChatController:
     # -------------------------------------------------
 
     def clear_chat(self):
-        for widget in self.chat.winfo_children():
-            widget.destroy()
+        self.history.clear_chat()
 
     def open_chat(self, chat_id):
-        self.current_chat = chat_id
-        self.welcome_cleared = True
-
-        self.clear_chat()
+        self.history.open_chat(chat_id)
 
     def new_chat(self):
-        self.current_chat = None
-        self.welcome_cleared = False
-        self.attached_file = None
-
-        self.clear_chat()
-        create_welcome_card(self.chat)
+        self.history.new_chat()
 
     def attach_file(self):
         filename = choose_file()
@@ -96,7 +88,6 @@ class ChatController:
     # -------------------------------------------------
 
     def preview_code_change(self, old_code, new_code):
-
         result = {
             "filename": (
                 self.editor.current_file
@@ -129,7 +120,6 @@ class ChatController:
     # -------------------------------------------------
 
     def improve_editor_code(self, editor):
-
         code = editor.get_text()
 
         if not code.strip():
@@ -159,9 +149,7 @@ class ChatController:
                 task,
                 1.0
             )
-
             self.right_sidebar.finish_task(task)
-
             self.right_sidebar.set_status(
                 "🟢 Ready"
             )
@@ -260,7 +248,6 @@ class ChatController:
     # -------------------------------------------------
 
     def inline_ai(self, event=None):
-
         if not self.editor:
             return
 
@@ -270,19 +257,16 @@ class ChatController:
         )
 
     def run_inline_ai(self, prompt):
-
         if not self.editor:
             return
 
         selected = self.editor.get_selected_text()
 
         if not selected:
-
             messagebox.showinfo(
                 "Future AI",
                 "Please select some code first."
             )
-
             return
 
         self.right_sidebar.set_status(
@@ -290,7 +274,6 @@ class ChatController:
         )
 
         conversation = [
-
             {
                 "role": "system",
                 "content":
@@ -300,14 +283,12 @@ class ChatController:
                     "Return ONLY the updated code."
                 )
             },
-
             {
                 "role": "user",
                 "content":
                     f"Instruction:\n{prompt}\n\n"
                     f"Selected Code:\n\n{selected}"
             }
-
         ]
 
         new_code = self.ai.chat(conversation)
@@ -318,93 +299,58 @@ class ChatController:
             return
 
         result = {
-
             "filename": self.editor.current_file,
-
             "old": selected,
-
             "new": new_code
-
         }
 
         def apply(updated):
-
             self.editor.replace_selected_text(
                 updated["new"]
             )
-
             self.editor.save_file()
 
         DiffViewer(
-
             self.app,
-
             result,
-
             apply
-
         )
 
     def run_agent(self, request):
-
         if not self.right_sidebar:
             return
-
-        # --------------------------------
-        # Reset Timeline
-        # --------------------------------
 
         self.right_sidebar.tasks.timeline.clear()
 
         analyze = self.right_sidebar.tasks.timeline.add_step(
             "Analyze Request"
         )
-
         index = self.right_sidebar.tasks.timeline.add_step(
             "Index Project"
         )
-
         plan = self.right_sidebar.tasks.timeline.add_step(
             "Plan Changes"
         )
-
         edit = self.right_sidebar.tasks.timeline.add_step(
             "Generate Code"
         )
-
         review = self.right_sidebar.tasks.timeline.add_step(
             "Review Changes"
         )
-
         apply = self.right_sidebar.tasks.timeline.add_step(
             "Apply Changes"
         )
-
         finished = self.right_sidebar.tasks.timeline.add_step(
             "Finished"
         )
 
-        # --------------------------------
-        # Analyze
-        # --------------------------------
-
         self.right_sidebar.tasks.timeline.running(analyze)
         self.app.update()
-
         self.right_sidebar.tasks.timeline.finish(analyze)
-
-        # --------------------------------
-        # Index
-        # --------------------------------
 
         self.right_sidebar.tasks.timeline.running(index)
         self.app.update()
-
         self.right_sidebar.tasks.timeline.finish(index)
-
-        # --------------------------------
-        # Plan
-        # --------------------------------
 
         self.right_sidebar.tasks.timeline.running(plan)
         self.app.update()
@@ -417,18 +363,9 @@ class ChatController:
 
         self.right_sidebar.tasks.timeline.finish(plan)
 
-        # --------------------------------
-        # Generate
-        # --------------------------------
-
         self.right_sidebar.tasks.timeline.running(edit)
         self.app.update()
-
         self.right_sidebar.tasks.timeline.finish(edit)
-
-        # --------------------------------
-        # Review
-        # --------------------------------
 
         self.right_sidebar.tasks.timeline.running(review)
         self.app.update()
@@ -442,22 +379,12 @@ class ChatController:
 
         self.right_sidebar.tasks.timeline.finish(review)
 
-        # --------------------------------
-        # Apply
-        # --------------------------------
-
         self.right_sidebar.tasks.timeline.running(apply)
         self.app.update()
-
         self.right_sidebar.tasks.timeline.finish(apply)
-
-        # --------------------------------
-        # Done
-        # --------------------------------
 
         self.right_sidebar.tasks.timeline.running(finished)
         self.app.update()
-
         self.right_sidebar.tasks.timeline.finish(finished)
 
         self.right_sidebar.set_status("🟢 Ready")
@@ -493,27 +420,7 @@ class ChatController:
             self.right_sidebar.set_status("🟢 Ready")
 
     def delete_chat(self, chat_id):
-        answer = messagebox.askyesno(
-            "Delete Chat",
-            "Delete this conversation?"
-        )
-
-        if not answer:
-            return
-
-        delete_chat(chat_id)
-
-        if self.current_chat == chat_id:
-            self.current_chat = None
-            self.attached_file = None
-            self.clear_chat()
-            create_welcome_card(self.chat)
-            self.welcome_cleared = False
-        elif self.current_chat is not None and chat_id < self.current_chat:
-            self.current_chat -= 1
-
-        if self.sidebar:
-            self.sidebar.refresh()
+        self.history.delete_chat(chat_id)
 
     def send(self, message_box):
         user = message_box.get().strip()
@@ -667,7 +574,6 @@ class ChatController:
     # -------------------------------------------------
 
     def open_symbol(self, filename, line):
-
         if not self.editor:
             return
 

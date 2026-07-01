@@ -9,12 +9,9 @@ class GhostText:
         self.start = None
         self.end = None
 
-        self.editor.tag_configure(
-
+        self.editor.tag_config(
             "ghost",
-
             foreground="#666666"
-
         )
 
     # --------------------------------
@@ -33,28 +30,19 @@ class GhostText:
         )
 
         self.editor.insert(
-
             self.start,
-
             text,
-
             "ghost"
-
         )
 
         self.end = self.editor.index(
-
             f"{self.start}+{len(text)}c"
-
         )
 
         # Put the cursor back where it was
         self.editor.mark_set(
-
             "insert",
-
             self.start
-
         )
 
     # --------------------------------
@@ -65,21 +53,14 @@ class GhostText:
             return
 
         try:
-
             self.editor.delete(
-
                 self.start,
-
                 self.end
-
             )
-
         except Exception:
-
             pass
 
         self.suggestion = ""
-
         self.start = None
         self.end = None
 
@@ -91,25 +72,17 @@ class GhostText:
             return
 
         self.editor.tag_remove(
-
             "ghost",
-
             self.start,
-
             self.end
-
         )
 
         self.editor.mark_set(
-
             "insert",
-
             self.end
-
         )
 
         self.suggestion = ""
-
         self.start = None
         self.end = None
 

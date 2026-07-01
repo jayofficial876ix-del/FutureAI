@@ -19,23 +19,69 @@ class AppLayout(ctk.CTkFrame):
 
         super().__init__(parent)
 
-        self.pack(fill="both", expand=True)
+        self.controller = controller
 
-        # --------------------------------
-        # Grid Layout
-        # --------------------------------
+        self.pack(
+            fill="both",
+            expand=True
+        )
 
-        self.grid_columnconfigure(0, weight=0, minsize=60)
-        self.grid_columnconfigure(1, weight=0, minsize=260)
-        self.grid_columnconfigure(2, weight=3)
-        self.grid_columnconfigure(3, weight=4)
-        self.grid_columnconfigure(4, weight=0, minsize=300)
+        self._configure_grid()
+        self._create_sidebar_stack()
+        self._create_activity_bar()
+        self._create_sidebar_pages()
+        self._create_center_chat()
+        self._create_editor()
+        self._create_right_sidebar()
 
-        self.grid_rowconfigure(0, weight=1)
+        self._register_pages()
 
-        # --------------------------------
-        # Sidebar Stack
-        # --------------------------------
+        self._load_project()
+
+    # --------------------------------------------------
+    # Grid
+    # --------------------------------------------------
+
+    def _configure_grid(self):
+
+        self.grid_columnconfigure(
+            0,
+            weight=0,
+            minsize=60
+        )
+
+        self.grid_columnconfigure(
+            1,
+            weight=0,
+            minsize=260
+        )
+
+        self.grid_columnconfigure(
+            2,
+            weight=3
+        )
+
+        self.grid_columnconfigure(
+            3,
+            weight=4
+        )
+
+        self.grid_columnconfigure(
+            4,
+            weight=0,
+            minsize=320
+        )
+
+        self.grid_rowconfigure(
+            0,
+            weight=1
+        )
+
+    # --------------------------------------------------
+    # Sidebar Stack
+    # --------------------------------------------------
+
+    def _create_sidebar_stack(self):
 
         self.left = SidebarStack(self)
 
@@ -45,9 +91,11 @@ class AppLayout(ctk.CTkFrame):
             sticky="nsew"
         )
 
-        # --------------------------------
-        # Activity Bar
-        # --------------------------------
+    # --------------------------------------------------
+    # Activity Bar
+    # --------------------------------------------------
+
+    def _create_activity_bar(self):
 
         self.activity = ActivityColumn(
             self,
@@ -60,44 +108,21 @@ class AppLayout(ctk.CTkFrame):
             sticky="ns"
         )
 
-        # --------------------------------
-        # Chat Sidebar
-        # --------------------------------
+    # --------------------------------------------------
+    # Sidebar Pages
+    # --------------------------------------------------
+
+    def _create_sidebar_pages(self):
 
         self.chat_page = LeftSidebar(
             self.left,
-            controller
+            self.controller
         )
-
-        # --------------------------------
-        # Editor
-        # --------------------------------
-
-        self.editor = EditorPanel(
-            self,
-            controller
-        )
-
-        self.editor.grid(
-            row=0,
-            column=3,
-            sticky="nsew"
-        )
-
-        controller.editor = self.editor
-
-        # --------------------------------
-        # Project Explorer
-        # --------------------------------
 
         self.explorer_page = ProjectExplorer(
             self.left,
-            self.editor.open_file
+            self.open_file
         )
-
-        # --------------------------------
-        # Other Pages
-        # --------------------------------
 
         self.search_page = PlaceholderPage(
             self.left,
@@ -119,26 +144,15 @@ class AppLayout(ctk.CTkFrame):
             "⚙ Settings"
         )
 
-        # --------------------------------
-        # Register Sidebar Pages
-        # --------------------------------
+    # --------------------------------------------------
+    # Center Chat
+    # --------------------------------------------------
 
-        self.left.add("chat", self.chat_page)
-        self.left.add("explorer", self.explorer_page)
-        self.left.add("search", self.search_page)
-        self.left.add("agent", self.agent_page)
-        self.left.add("tools", self.tools_page)
-        self.left.add("settings", self.settings_page)
-
-        self.left.show("chat")
-
-        # --------------------------------
-        # Center Chat
-        # --------------------------------
+    def _create_center_chat(self):
 
         self.center = CenterChat(
             self,
-            controller
+            self.controller
         )
 
         self.center.grid(
@@ -147,9 +161,30 @@ class AppLayout(ctk.CTkFrame):
             sticky="nsew"
         )
 
-        # --------------------------------
-        # Right Sidebar
-        # --------------------------------
+    # --------------------------------------------------
+    # Editor
+    # --------------------------------------------------
+
+    def _create_editor(self):
+
+        self.editor = EditorPanel(
+            self,
+            self.controller
+        )
+
+        self.editor.grid(
+            row=0,
+            column=3,
+            sticky="nsew"
+        )
+
+        self.controller.editor = self.editor
+
+    # --------------------------------------------------
+    # Right Sidebar
+    # --------------------------------------------------
+
+    def _create_right_sidebar(self):
 
         self.right = RightSidebar(self)
 
@@ -159,28 +194,91 @@ class AppLayout(ctk.CTkFrame):
             sticky="nsew"
         )
 
-        # Give the controller access to the AI Workspace
-        controller.right_sidebar = self.right
+        self.controller.right_sidebar = self.right
 
-        # --------------------------------
-        # Load Project Into Explorer
-        # --------------------------------
+    # --------------------------------------------------
+    # Register Pages
+    # --------------------------------------------------
+
+    def _register_pages(self):
+
+        self.left.add(
+            "chat",
+            self.chat_page
+        )
+
+        self.left.add(
+            "explorer",
+            self.explorer_page
+        )
+
+        self.left.add(
+            "search",
+            self.search_page
+        )
+
+        self.left.add(
+            "agent",
+            self.agent_page
+        )
+
+        self.left.add(
+            "tools",
+            self.tools_page
+        )
+
+        self.left.add(
+            "settings",
+            self.settings_page
+        )
+
+        self.left.show("chat")
+
+    # --------------------------------------------------
+    # Open File
+    # --------------------------------------------------
+
+    def open_file(self, filename):
+
+        self.editor.open_file(filename)
+
+    # --------------------------------------------------
+    # Load Project
+    # --------------------------------------------------
+
+    def _load_project(self):
 
         try:
+
             projects = load_projects()
 
-            if projects:
-                project = projects[0]
+            if not projects:
+                return
 
-                if isinstance(project, dict):
-                    project_path = project.get("path")
-                else:
-                    project_path = project
+            project = projects[0]
 
-                if project_path:
-                    self.explorer_page.load_project(
-                        project_path
-                    )
+            if isinstance(
+                project,
+                dict
+            ):
+
+                path = project.get(
+                    "path"
+                )
+
+            else:
+
+                path = project
+
+            if path:
+
+                self.explorer_page.load_project(
+                    path
+                )
 
         except Exception as e:
-            print("Explorer:", e)
+
+            print(
+                "Project Explorer:",
+                e
+            )
